@@ -1,0 +1,73 @@
+export const QUALITY_TABS = [
+  'Visão Geral','Qualidade por Marco','Qualidade por Disciplina','Campos Incompletos','Cronograma e Predecessores','Medição e GED','BIM + AWP','Riscos e Restrições','Comparativo entre Relatórios','Lista de Correções'
+];
+
+const requiredFields = [
+  ['codigoEAP'],['codigoMarco'],['status'],['dataPrevistaG5'],['dataContratual'],['assignedTo'],['impactoCronograma'],['impactoMedicao'],['riscoPrevisto'],['tipoRiscoRestricao']
+];
+
+const empty = (v) => v === null || v === undefined || String(v).trim() === '';
+
+const getCustom = (issue, aliases=[]) => {
+  const attrs = issue.customAttributes || [];
+  const norms = aliases.map((a) => normalize(a));
+  const found = attrs.find((a) => norms.some((n) => normalize(a.name || a.id).includes(n)));
+  return found?.value ?? null;
+};
+const normalize = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+export function mapIssueToQualityIssue(issue) {
+  return {
+    id: Number(issue.displayId || issue.id) || issue.id,
+    title: issue.title || '',
+    status: issue.status || null,
+    type: issue.issueType || null,
+    assignedTo: issue.assignedTo?.name || issue.assignedTo || null,
+    dueDate: issue.dueDate || null,
+    prioridade: getCustom(issue, ['prioridade']),
+    codigoEAP: getCustom(issue, ['codigo eap','eap']),
+    codigoMarco: getCustom(issue, ['codigo do marco','codigo marco','marco']),
+    disciplina: getCustom(issue, ['disciplina']),
+    impactoCronograma: getCustom(issue, ['impacto no cronograma','impacto prazo']),
+    impactoMedicao: getCustom(issue, ['impacto em medicao']),
+    impactoCusto: getCustom(issue, ['impacto em custo']),
+    riscoPrevisto: getCustom(issue, ['risco previsto']),
+    tipoRiscoRestricao: getCustom(issue, ['tipo de risco', 'restricao']),
+    statusCliente: getCustom(issue, ['status cliente']),
+    dataContratual: getCustom(issue, ['data contratual']),
+    dataPrevistaG5: getCustom(issue, ['data prevista g5']),
+    predecessor: getCustom(issue, ['predecessor']),
+    numeroGED: getCustom(issue, ['numero ged','número ged']),
+    modeloBimVinculado: getCustom(issue, ['modelo bim vinculado']),
+    codigoAWPWF: getCustom(issue, ['codigo awp', 'codigo wf']),
+    necessitaReuniao: getCustom(issue, ['necessita reuniao']),
+    encaminhamentoDecisaoFinal: getCustom(issue, ['encaminhamento','decisao final'])
+  };
+}
+
+export function buildQualityDashboard(issuesRaw, previous = null) {
+  const issues = issuesRaw.map(mapIssueToQualityIssue);
+  const issueWithIqi = issues.map((issue) => {
+    const applicable = requiredFields.length;
+    const filled = requiredFields.filter(([key]) => !empty(issue[key])).length;
+    const iqi = applicable ? (filled / applicable) * 100 : 0;
+    return { ...issue, iqi, overdue: !empty(issue.dueDate) && !['closed','completed','fechado','concluido'].includes(normalize(issue.status)) && new Date(issue.dueDate) < new Date() };
+  });
+  const avg = issueWithIqi.length ? issueWithIqi.reduce((a, i) => a + i.iqi, 0) / issueWithIqi.length : 0;
+  const prevAvg = previous?.avgIqi || 0;
+  return {
+    issues: issueWithIqi,
+    avgIqi: avg,
+    deltaIqi: avg - prevAvg,
+    cards: {
+      total: issueWithIqi.length,
+      open: issueWithIqi.filter((i) => !['closed','completed','fechado','concluido'].includes(normalize(i.status))).length,
+      closed: issueWithIqi.filter((i) => ['closed','completed','fechado','concluido'].includes(normalize(i.status))).length,
+      overdue: issueWithIqi.filter((i) => i.overdue).length,
+      noAssignee: issueWithIqi.filter((i) => empty(i.assignedTo)).length,
+      noEap: issueWithIqi.filter((i) => empty(i.codigoEAP)).length,
+      noMarco: issueWithIqi.filter((i) => empty(i.codigoMarco)).length,
+      highRisk: issueWithIqi.filter((i) => normalize(i.riscoPrevisto).includes('alto')).length
+    }
+  };
+}
