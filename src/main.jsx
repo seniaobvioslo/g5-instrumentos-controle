@@ -54,9 +54,14 @@ const UNCLASSIFIED_BUSINESS_UNIT = 'Nao classificado';
 
 const businessUnitOptions = [
   {
+    value: 'G5 Engenharia',
+    title: 'G5 Engenharia',
+    description: 'Gestao e Coordenacao de Projetos BIM'
+  },
+  {
     value: 'G5 Instrumentos',
     title: 'G5 Instrumentos',
-    description: 'Controle de obras, equipes, equipamentos, materiais e pendencias'
+    description: 'Gestao de Obras e Ativos'
   }
 ];
 
@@ -1164,7 +1169,8 @@ const scheduleFieldAliases = {
   tipoValidacaoBim: ['Tipo de Validação BIM', 'Tipo de Validacao BIM'],
   avaliacaoQualidade: ['Avaliação Qualidade', 'Avaliacao Qualidade'],
   percentualTecnico: ['Percentual Técnico', 'Percentual Tecnico'],
-  predecessor: ['Predecessor']
+  predecessor: ['Predecessor'],
+  dependencia: ['Dependência', 'Dependencia']
 };
 
 const scheduleFieldLabels = {
@@ -1176,6 +1182,7 @@ const scheduleFieldLabels = {
 
 const scheduleViewModes = [
   { id: 'executiva', label: 'Visão Executiva' },
+  { id: 'coordenacao', label: 'Visão de Coordenação' },
   { id: 'tramitacao', label: 'Visão Tramitação' },
   { id: 'critica', label: 'Visão Crítica' },
   { id: 'completa', label: 'Visão Completa' }
@@ -1340,6 +1347,28 @@ function getStatusPresentation(status) {
   if (normalized === 'closed' || normalized === 'completed') return { icon: '⚫', color: '#6b7280' };
   if (normalized === 'draft') return { icon: '⚪', color: '#9ca3af' };
   return { icon: '🔵', color: '#3b82f6' };
+}
+
+function getIssueStatusLabel(status) {
+  const rawStatus = String(status || '').trim();
+  if (!rawStatus) return 'Sem status';
+
+  const normalizedStatus = normalizeText(rawStatus).replace(/\s+/g, '_');
+  const matchedStatus = statusOptions.find((option) => {
+    const optionValue = normalizeText(option.value).replace(/\s+/g, '_');
+    const optionLabel = normalizeText(option.label);
+    return optionValue === normalizedStatus || optionLabel === normalizeText(rawStatus);
+  });
+
+  if (matchedStatus) return matchedStatus.label;
+  if (['in_progress', 'inprogress', 'em_andamento', 'em_andamento'].includes(normalizedStatus)) return 'Em andamento';
+  if (['in_review', 'em_revisao', 'em_revisão'].includes(normalizedStatus)) return 'Em revisão';
+  if (['completed', 'complete', 'done', 'concluido', 'concluído'].includes(normalizedStatus)) return 'Concluído';
+  if (['closed', 'fechado', 'encerrado'].includes(normalizedStatus)) return 'Fechado';
+  if (['pending', 'pendente'].includes(normalizedStatus)) return 'Pendente';
+  if (['open', 'aberto'].includes(normalizedStatus)) return 'Aberto';
+
+  return rawStatus;
 }
 
 function getIssueDiscipline(issue) {
@@ -1562,7 +1591,7 @@ function App() {
   const [documentTypeFilter, setDocumentTypeFilter] = useState('all');
   const [selectedHubId, setSelectedHubId] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [selectedBusinessUnit, setSelectedBusinessUnit] = useState(() => localStorage.getItem('g5-instrumentos-business-unit') || 'G5 Instrumentos');
+  const [selectedBusinessUnit, setSelectedBusinessUnit] = useState(() => localStorage.getItem('central-g5-business-unit') || '');
   const [selectedIssueId, setSelectedIssueId] = useState('');
   const [selectedIssueDetails, setSelectedIssueDetails] = useState(null);
   const [selectedIssueDetailsLoading, setSelectedIssueDetailsLoading] = useState(false);
@@ -1602,6 +1631,12 @@ function App() {
     disciplina: '',
     description: ''
   });
+  const [kanbanColumnDraft, setKanbanColumnDraft] = useState({
+    title: '',
+    code: ''
+  });
+  const [kanbanManualColumns, setKanbanManualColumns] = useState([]);
+  const [kanbanColumnMessage, setKanbanColumnMessage] = useState('');
   const [kanbanCreating, setKanbanCreating] = useState(false);
   const [kanbanMovingIssueId, setKanbanMovingIssueId] = useState('');
   const [kanbanMoveDrafts, setKanbanMoveDrafts] = useState({});
@@ -1676,6 +1711,8 @@ function App() {
   const [scheduleAdvancedFiltersOpen, setScheduleAdvancedFiltersOpen] = useState(false);
   const [scheduleFormulaSelections, setScheduleFormulaSelections] = useState({});
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [scheduleAutosaveState, setScheduleAutosaveState] = useState('idle');
+  const [scheduleAutosaveMessage, setScheduleAutosaveMessage] = useState('');
   const [qualityTab, setQualityTab] = useState(QUALITY_TABS[0]);
   const [qualityData, setQualityData] = useState(null);
   const [qualityReportInfo, setQualityReportInfo] = useState(null);
@@ -1718,6 +1755,7 @@ function App() {
   const [error, setError] = useState('');
   const documentTopScrollRef = useRef(null);
   const documentTableScrollRef = useRef(null);
+  const scheduleAutosaveTimerRef = useRef(null);
 
   const loginMessage = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -2008,7 +2046,7 @@ function App() {
       return;
     }
 
-    const cacheKey = `g5-instrumentos-recursos:${selectedProjectId}`;
+    const cacheKey = `central-g5-instrumentos-recursos:${selectedProjectId}`;
     try {
       setInstrumentResourceOverrides(JSON.parse(localStorage.getItem(cacheKey) || '{}'));
     } catch (storageError) {
@@ -3312,6 +3350,7 @@ function App() {
   const scheduleColumns = useMemo(() => {
     const columns = {
       executiva: ['eapAuto', 'codigoMarco', 'title', 'inicioPlanejado', 'diasPrevistosAtividade', 'terminoPlanejado', 'inicioReal', 'terminoReal', 'dataContratual', 'dataLimiteInterna', 'predecessor', 'dependencia', 'statusEntrega', 'delay', 'acaoNecessaria', 'prioridadeGestao', 'dataPublicacao', 'progress'],
+      coordenacao: ['eapAuto', 'codigoMarco', 'title', 'assignedTo', 'inicioPlanejado', 'diasPrevistosAtividade', 'terminoPlanejado', 'inicioReal', 'terminoReal', 'dataLimiteInterna', 'predecessor', 'dependencia', 'vinculoDependencia', 'statusEntrega', 'delay', 'acaoNecessaria', 'prioridadeGestao', 'dataPublicacao', 'progress'],
       tramitacao: ['eapAuto', 'codigoMarco', 'title', 'inicioPlanejado', 'terminoPlanejado', 'predecessor', 'dependencia', 'dataPublicacao', 'numeroTramitacao', 'statusCliente', 'dataRealEmissao', 'dataLimiteRetornoCliente', 'dataRealRetornoCliente', 'dataLimiteRevisaoInterna', 'dataRealReemissao', 'dataAprovacaoFinal'],
       critica: ['eapAuto', 'codigoMarco', 'title', 'inicioPlanejado', 'diasPrevistosAtividade', 'terminoPlanejado', 'inicioReal', 'terminoReal', 'dataContratual', 'dataLimiteInterna', 'predecessor', 'dependencia', 'impactoCronograma', 'prioridadeGestao', 'delay', 'acaoNecessaria'],
       completa: ['eapAuto', 'typeLabel', 'eapVinculada', 'codigoMarco', 'marcoContratual', 'codigoDocumentoCliente', 'codigoDocumentoInterno', 'title', 'disciplinaEnvolvida', 'areaResponsavel', 'fase', 'tipoItemCronograma', 'faseFluxo', 'statusEntrega', 'statusCliente', 'inicioPlanejado', 'diasPrevistosAtividade', 'terminoPlanejado', 'inicioReal', 'terminoReal', 'dataContratual', 'dataLimiteInterna', 'predecessor', 'dependencia', 'dataMetaInterna', 'dataPublicacao', 'dataRealEmissao', 'dataLimiteRetornoCliente', 'dataRealRetornoCliente', 'dataLimiteRevisaoInterna', 'dataAprovacaoFinal', 'impactoMarco', 'impactoCronograma', 'prioridadeGestao', 'percentualTecnico', 'progress', 'delay', 'acaoNecessaria']
@@ -3358,6 +3397,331 @@ function App() {
       if (firstValue !== secondValue) return firstValue - secondValue;
     }
     return firstParts.length - secondParts.length;
+  }
+
+  function isScheduleCompletionValue(value) {
+    const normalizedValue = normalizeText(value);
+    return scheduleCompletionStatuses.some((status) => normalizedValue.includes(normalizeText(status)));
+  }
+
+  function buildSchedulePredecessorMaps(rows, edits = {}) {
+    const rowById = new Map();
+    const rowByLookupKey = new Map();
+    rows.forEach((row) => {
+      rowById.set(String(row.id), row);
+      [
+        row.id,
+        row.issue?.id,
+        row.issue?.displayId,
+        row.issue?.autodeskId,
+        getIssueHumanId(row.issue)
+      ]
+        .filter(Boolean)
+        .forEach((value) => rowByLookupKey.set(normalizeText(String(value)), row));
+    });
+
+    const predecessorsByRowId = new Map();
+    const missingByRowId = new Map();
+    rows.forEach((row) => {
+      const rawValue = normalizePredecessorInput(edits[row.id]?.predecessor ?? row.fields.predecessor);
+      const predecessorIds = parsePredecessorIds(rawValue);
+      const resolvedRows = [];
+      const missingValues = [];
+      predecessorIds.forEach((predecessorId) => {
+        const matchedRow = rowByLookupKey.get(normalizeText(predecessorId));
+        if (matchedRow) {
+          resolvedRows.push(matchedRow);
+        } else {
+          missingValues.push(predecessorId);
+        }
+      });
+      predecessorsByRowId.set(row.id, resolvedRows);
+      missingByRowId.set(row.id, missingValues);
+    });
+
+    return { rowById, rowByLookupKey, predecessorsByRowId, missingByRowId };
+  }
+
+  function detectSchedulePredecessorCycle(rows, edits = {}) {
+    const { predecessorsByRowId } = buildSchedulePredecessorMaps(rows, edits);
+    const visiting = new Set();
+    const visited = new Set();
+
+    const visit = (rowId, trail = []) => {
+      if (visiting.has(rowId)) return [...trail, rowId];
+      if (visited.has(rowId)) return null;
+      visiting.add(rowId);
+      const predecessors = predecessorsByRowId.get(rowId) || [];
+      for (const predecessorRow of predecessors) {
+        if (!predecessorRow?.id) continue;
+        const cycle = visit(predecessorRow.id, [...trail, rowId]);
+        if (cycle) return cycle;
+      }
+      visiting.delete(rowId);
+      visited.add(rowId);
+      return null;
+    };
+
+    for (const row of rows) {
+      const cycle = visit(row.id, []);
+      if (cycle) return cycle;
+    }
+    return null;
+  }
+
+  function orderScheduleRowsByPredecessor(rows, edits = {}) {
+    const baseRows = [...rows];
+    const baseIndexById = new Map(baseRows.map((row, index) => [row.id, index]));
+    const { predecessorsByRowId } = buildSchedulePredecessorMaps(baseRows, edits);
+    const primaryPredecessorByRowId = new Map();
+    const childrenByPredecessorId = new Map();
+
+    baseRows.forEach((row) => {
+      const primaryPredecessor = (predecessorsByRowId.get(row.id) || [])[0] || null;
+      primaryPredecessorByRowId.set(row.id, primaryPredecessor?.id || null);
+      if (!primaryPredecessor?.id) return;
+      if (!childrenByPredecessorId.has(primaryPredecessor.id)) childrenByPredecessorId.set(primaryPredecessor.id, []);
+      childrenByPredecessorId.get(primaryPredecessor.id).push(row);
+    });
+
+    childrenByPredecessorId.forEach((children) => {
+      children.sort((first, second) => (baseIndexById.get(first.id) || 0) - (baseIndexById.get(second.id) || 0));
+    });
+
+    const ordered = [];
+    const visited = new Set();
+    const emit = (row) => {
+      if (!row || visited.has(row.id)) return;
+      visited.add(row.id);
+      ordered.push(row);
+      (childrenByPredecessorId.get(row.id) || []).forEach((child) => emit(child));
+    };
+
+    baseRows.filter((row) => !primaryPredecessorByRowId.get(row.id)).forEach((row) => emit(row));
+    baseRows.forEach((row) => emit(row));
+    return ordered;
+  }
+
+  function formatScheduleCycleMessage(cycleIds, rows) {
+    const rowById = new Map(rows.map((row) => [row.id, row]));
+    const labels = cycleIds.map((rowId) => {
+      const row = rowById.get(rowId);
+      return row ? (getIssueHumanId(row.issue) || row.issue?.title || rowId) : rowId;
+    });
+    return labels.join(' → ');
+  }
+
+  function applyScheduleOrderFromDependencies(nextEdits) {
+    const orderedRows = orderScheduleRowsByPredecessor(scheduleRows, nextEdits);
+    setSchedulePlannerLayout((current) => Object.fromEntries(
+      orderedRows.map((row, index) => {
+        const currentLayout = current[row.id] || {};
+        const fallbackLevel = Number(row.plannerLevel ?? row.level ?? 0);
+        return [
+          row.id,
+          {
+            order: index,
+            level: Number.isFinite(Number(currentLayout.level)) ? Number(currentLayout.level) : fallbackLevel,
+            parentId: currentLayout.parentId ?? row.plannerParentId ?? row.parentId ?? null
+          }
+        ];
+      })
+    ));
+  }
+
+  function buildSchedulePredecessorValidation(issueId, value, currentEdits) {
+    const currentIssueEdits = currentEdits[issueId] || {};
+    const nextEdits = {
+      ...currentEdits,
+      [issueId]: {
+        ...currentIssueEdits,
+        predecessor: value
+      }
+    };
+    const currentRow = scheduleRows.find((row) => row.id === issueId);
+    if (!currentRow) return { valid: true, nextEdits };
+
+    const { rowByLookupKey, missingByRowId } = buildSchedulePredecessorMaps(scheduleRows, nextEdits);
+    const missing = missingByRowId.get(issueId) || [];
+    if (missing.length) {
+      return {
+        valid: false,
+        message: `Predecessor não encontrado: ${missing.join(', ')}. Verifique o ID do issue antes de salvar.`,
+        nextEdits
+      };
+    }
+
+    const directPredecessors = parsePredecessorIds(value);
+    const selfReference = directPredecessors.some((predecessorId) => {
+      const matchedRow = rowByLookupKey.get(normalizeText(predecessorId));
+      return matchedRow?.id === issueId;
+    });
+    if (selfReference) {
+      return {
+        valid: false,
+        message: 'Um item não pode apontar para si mesmo como predecessor.',
+        nextEdits
+      };
+    }
+
+    const cycle = detectSchedulePredecessorCycle(scheduleRows, nextEdits);
+    if (cycle) {
+      return {
+        valid: false,
+        message: `Alteração bloqueada: o predecessor informado cria um ciclo de dependência (${formatScheduleCycleMessage(cycle, scheduleRows)}).`,
+        nextEdits
+      };
+    }
+
+    return { valid: true, nextEdits };
+  }
+
+  function resolveSchedulePredecessorRows(row, edits = scheduleEdits) {
+    const rawValue = normalizePredecessorInput(edits[row.id]?.predecessor ?? row.fields.predecessor);
+    const predecessorIds = parsePredecessorIds(rawValue);
+    const lookup = new Map();
+    scheduleRows.forEach((candidate) => {
+      [
+        candidate.id,
+        candidate.issue?.id,
+        candidate.issue?.displayId,
+        candidate.issue?.autodeskId,
+        getIssueHumanId(candidate.issue)
+      ]
+        .filter(Boolean)
+        .forEach((value) => lookup.set(normalizeText(String(value)), candidate));
+    });
+    return predecessorIds.map((predecessorId) => ({
+      id: predecessorId,
+      row: lookup.get(normalizeText(predecessorId)) || null
+    }));
+  }
+
+  function getScheduleDependencyState(row, edits = scheduleEdits) {
+    const predecessorLinks = resolveSchedulePredecessorRows(row, edits);
+    const dependencyValue = edits[row.id]?.dependencia ?? row.localDependency ?? row.fields.dependencia ?? 'Nao';
+    const dependencyEnabled = normalizeText(dependencyValue).startsWith('s');
+
+    if (!predecessorLinks.length) {
+      return {
+        status: 'none',
+        label: 'Sem predecessor',
+        detail: '',
+        blocked: false,
+        released: false,
+        missing: false,
+        enabled: dependencyEnabled,
+        predecessorLinks
+      };
+    }
+
+    const missing = predecessorLinks.filter((link) => !link.row);
+    if (missing.length) {
+      return {
+        status: 'missing',
+        label: '⚠️ Predecessor não encontrado',
+        detail: missing.map((link) => link.id).join(', '),
+        blocked: true,
+        released: false,
+        missing: true,
+        enabled: dependencyEnabled,
+        predecessorLinks
+      };
+    }
+
+    if (!dependencyEnabled) {
+      const firstLink = predecessorLinks[0];
+      return {
+        status: 'info',
+        label: `🔗 Vínculo informativo ${getIssueHumanId(firstLink.row.issue) || firstLink.id}`,
+        detail: firstLink.row.issue?.title || '',
+        blocked: false,
+        released: false,
+        missing: false,
+        enabled: dependencyEnabled,
+        predecessorLinks
+      };
+    }
+
+    const pending = predecessorLinks.filter((link) => !isScheduleCompleted(link.row.issue, customFieldDefinitions, {
+      ...link.row.fields,
+      ...edits[link.row.id]
+    }));
+    if (pending.length) {
+      const firstPending = pending[0];
+      return {
+        status: 'blocked',
+        label: `🔒 Bloqueada por ${getIssueHumanId(firstPending.row.issue) || firstPending.id}`,
+        detail: firstPending.row.issue?.title || '',
+        blocked: true,
+        released: false,
+        missing: false,
+        enabled: dependencyEnabled,
+        predecessorLinks
+      };
+    }
+
+    const firstLink = predecessorLinks[0];
+    return {
+      status: 'released',
+      label: `✅ Liberada por ${getIssueHumanId(firstLink.row.issue) || firstLink.id}`,
+      detail: firstLink.row.issue?.title || '',
+      blocked: false,
+      released: true,
+      missing: false,
+      enabled: dependencyEnabled,
+      predecessorLinks
+    };
+  }
+
+  function validateScheduleEapChange(issueId, value, currentEdits) {
+    const normalizedValue = String(value || '').trim();
+    if (normalizedValue && !/^\d+(\.\d*)*$/.test(normalizedValue)) {
+      return {
+        valid: false,
+        message: 'EAP inválida. Use somente números separados por ponto, por exemplo: 2.3.7.1.'
+      };
+    }
+    if (!normalizedValue || normalizedValue.endsWith('.')) return { valid: true };
+
+    const duplicatedRow = scheduleRows.find((row) => {
+      if (row.id === issueId) return false;
+      const candidateValue = String(currentEdits[row.id]?.eapVinculada ?? row.fields.eapVinculada ?? '').trim();
+      return candidateValue && normalizeText(candidateValue) === normalizeText(normalizedValue);
+    });
+    if (duplicatedRow) {
+      return {
+        valid: false,
+        message: `EAP duplicada. O código ${normalizedValue} já está vinculado ao item ${duplicatedRow.issue?.title || getIssueHumanId(duplicatedRow.issue)}.`
+      };
+    }
+
+    return { valid: true };
+  }
+
+  function applyScheduleOrderFromEap(nextEdits) {
+    const orderedRows = [...scheduleRows].sort((first, second) => {
+      const firstValue = nextEdits[first.id]?.eapVinculada ?? first.fields.eapVinculada ?? '';
+      const secondValue = nextEdits[second.id]?.eapVinculada ?? second.fields.eapVinculada ?? '';
+      const eapCompare = compareScheduleEapParts(getScheduleEapParts(firstValue), getScheduleEapParts(secondValue));
+      if (eapCompare) return eapCompare;
+      return String(first.issue?.title || '').localeCompare(String(second.issue?.title || ''), 'pt-BR', { numeric: true, sensitivity: 'base' });
+    });
+
+    setSchedulePlannerLayout((current) => Object.fromEntries(
+      orderedRows.map((row, index) => {
+        const currentLayout = current[row.id] || {};
+        const eapParts = getScheduleEapParts(nextEdits[row.id]?.eapVinculada ?? row.fields.eapVinculada ?? '');
+        return [
+          row.id,
+          {
+            order: index,
+            level: eapParts.length ? Math.max(0, eapParts.length - 1) : (Number.isFinite(Number(currentLayout.level)) ? Number(currentLayout.level) : row.level || 0),
+            parentId: currentLayout.parentId ?? row.plannerParentId ?? row.parentId ?? null
+          }
+        ];
+      })
+    ));
   }
 
   function buildSchedulePlannerRows(rows, layout) {
@@ -3600,12 +3964,110 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setKanbanManualColumns([]);
+      setKanbanColumnMessage('');
+      return;
+    }
+
+    const storageKey = `g5-kanban-manual-marcos:${selectedProjectId}`;
+    try {
+      const storedColumns = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      setKanbanManualColumns(Array.isArray(storedColumns) ? storedColumns : []);
+    } catch {
+      setKanbanManualColumns([]);
+    }
+    setKanbanColumnMessage('');
+  }, [selectedProjectId]);
+
   function updateKanbanDraft(field, value) {
     setKanbanDraft((current) => ({ ...current, [field]: value }));
   }
 
   function updateKanbanEditDraft(field, value) {
     setKanbanEditDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function normalizeKanbanColumnKey(value) {
+    return normalizeText(value).replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  function getKanbanManualColumnsStorageKey(projectId = selectedProjectId) {
+    return projectId ? `g5-kanban-manual-marcos:${projectId}` : '';
+  }
+
+  function persistKanbanManualColumns(projectId, columns) {
+    const storageKey = getKanbanManualColumnsStorageKey(projectId);
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(columns));
+    } catch {
+      // Mantem a coluna em memoria mesmo se o navegador bloquear o localStorage.
+    }
+  }
+
+  function updateKanbanColumnDraft(field, value) {
+    setKanbanColumnDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function createKanbanMarcoColumn(event) {
+    event.preventDefault();
+    const title = String(kanbanColumnDraft.title || '').trim();
+    const code = String(kanbanColumnDraft.code || '').trim();
+
+    if (!title) {
+      setError('Informe o nome do Marco Contratual para criar a coluna.');
+      return;
+    }
+
+    const titleKey = normalizeKanbanColumnKey(title);
+    const codeKey = normalizeKanbanColumnKey(code);
+    const duplicated = linkKanbanColumns.some((column) => {
+      const columnTitleKey = normalizeKanbanColumnKey(getKanbanColumnLinkLabel(column));
+      const columnCodeKey = normalizeKanbanColumnKey(column.code);
+      return columnTitleKey === titleKey || (codeKey && columnCodeKey === codeKey);
+    });
+
+    if (duplicated) {
+      setError('Ja existe uma coluna com este Marco Contratual ou Código do Marco.');
+      return;
+    }
+
+    const manualColumn = {
+      id: `manual-marco-${Date.now()}-${titleKey || 'marco'}`,
+      code,
+      title,
+      deliveryTitle: title,
+      marcoContratual: title,
+      marcoFieldValue: title,
+      canReceiveCards: true,
+      isManual: true
+    };
+
+    setKanbanManualColumns((current) => {
+      const nextColumns = [...current, manualColumn];
+      persistKanbanManualColumns(selectedProjectId, nextColumns);
+      return nextColumns;
+    });
+    setKanbanColumnDraft({ title: '', code: '' });
+    setKanbanColumnMessage('Coluna de Marco Contratual criada apenas no quadro. Ao mover cards para ela, o campo Marco Contratual será atualizado no ACC.');
+    setError('');
+  }
+
+  function removeKanbanManualColumn(columnId) {
+    const column = linkKanbanColumns.find((item) => item.id === columnId);
+    if (!column?.isManual) return;
+    if (column.cards?.length) {
+      setError('Esta coluna possui cards. Mova os cards antes de remover a coluna.');
+      return;
+    }
+    setKanbanManualColumns((current) => {
+      const nextColumns = current.filter((item) => item.id !== columnId);
+      persistKanbanManualColumns(selectedProjectId, nextColumns);
+      return nextColumns;
+    });
+    setKanbanColumnMessage('Coluna manual removida do quadro.');
   }
 
   function getKanbanAssignedUserId(issue) {
@@ -3726,7 +4188,7 @@ function App() {
     if (!column) return '';
     const code = String(column.code || '').trim();
     if (!code || normalizeText(code) === 'sem marco') return '';
-    return `Marco Contratual: ${code}`;
+    return `Código do Marco: ${code}`;
   }
 
   function getKanbanWriteValue(field, preferredValues) {
@@ -3854,124 +4316,141 @@ function App() {
     }
   }
 
-  function moveKanbanCard(issue, nextMarcoId) {
+  function buildKanbanMoveUpdates(column) {
+    const codigoMarcoField = findCustomFieldDefinition(customFieldDefinitions, CODIGO_MARCO_FIELD_ALIASES);
+    const marcoContratualField = getKanbanMarcoContratualField();
+    const marcoTitleField = getKanbanMarcoTitleField();
+
+    if (!marcoContratualField?.id) {
+      throw new Error('Nao encontrei o campo personalizado "Marco Contratual" para atualizar o card no ACC.');
+    }
+
+    const columnTitle = getKanbanColumnLinkLabel(column);
+    const marcoContratualValue = getKanbanWriteValue(marcoContratualField, [
+      columnTitle,
+      column.title,
+      column.marcoContratual,
+      column.code
+    ]);
+    const marcoTitleValue = getKanbanWriteValue(marcoTitleField, [
+      columnTitle,
+      column.title,
+      column.marcoContratual,
+      column.code
+    ]);
+
+    const updates = [];
+    if (marcoContratualField?.id && marcoContratualValue) {
+      updates.push({ field: marcoContratualField, value: marcoContratualValue });
+    }
+    if (codigoMarcoField?.id && column.code && String(codigoMarcoField.id) !== String(marcoContratualField.id)) {
+      updates.push({ field: codigoMarcoField, value: column.code });
+    }
+    if (
+      marcoTitleField?.id &&
+      marcoTitleValue &&
+      String(marcoTitleField.id) !== String(marcoContratualField.id) &&
+      String(marcoTitleField.id) !== String(codigoMarcoField?.id || '')
+    ) {
+      updates.push({ field: marcoTitleField, value: marcoTitleValue });
+    }
+
+    if (!updates.length) {
+      throw new Error('Nao foi possivel preparar a atualizacao do Marco Contratual para este card.');
+    }
+
+    return updates;
+  }
+
+  async function moveKanbanCard(issue, nextMarcoId) {
     const nextColumn = linkKanbanColumns.find((column) => column.id === nextMarcoId);
     if (!issue?.id || !nextColumn?.canReceiveCards) return;
 
-    const codigoMarcoField = findCustomFieldDefinition(customFieldDefinitions, CODIGO_MARCO_FIELD_ALIASES);
-    if (!codigoMarcoField?.id) {
-      setError('Nao encontrei o campo personalizado "Código do Marco" para mover este card.');
+    const previousCustomAttributes = issue.customAttributes || [];
+    let updates = [];
+
+    try {
+      updates = buildKanbanMoveUpdates(nextColumn);
+    } catch (requestError) {
+      setError(requestError.message);
       return;
     }
 
-    const marcoContratualField = getKanbanMarcoContratualField();
-    const marcoTitleField = getKanbanMarcoTitleField();
-    const marcoContratualValue = getKanbanWriteValue(marcoContratualField, [
-      getKanbanColumnLinkLabel(nextColumn),
-      nextColumn.title,
-      nextColumn.code
-    ]);
-    const marcoTitleValue = getKanbanWriteValue(marcoTitleField, [
-      getKanbanColumnLinkLabel(nextColumn),
-      nextColumn.title,
-      nextColumn.code
-    ]);
-
     setKanbanMovingIssueId(issue.id);
+    setSelectedKanbanIssueId(issue.id);
     setError('');
 
-    setKanbanMoveDrafts((current) => ({
-      ...current,
-      [issue.id]: {
-        columnId: nextColumn.id,
-        code: nextColumn.code,
-        title: getKanbanColumnLinkLabel(nextColumn)
-      }
-    }));
     setIssues((currentIssues) =>
       currentIssues.map((currentIssue) =>
         currentIssue.id === issue.id
           ? {
               ...currentIssue,
-              customAttributes: mergeIssueCustomAttributeValues(currentIssue, [
-                { field: codigoMarcoField, value: nextColumn.code },
-                { field: marcoContratualField, value: marcoContratualValue },
-                { field: marcoTitleField, value: marcoTitleValue }
-              ])
+              customAttributes: mergeIssueCustomAttributeValues(currentIssue, updates)
             }
           : currentIssue
       )
     );
-    setSelectedKanbanIssueId(issue.id);
-    setKanbanMovingIssueId('');
+
+    try {
+      await requestJson('/api/auth/keep-alive', { method: 'POST' });
+      const customAttributes = updates.map(({ field, value }) => {
+        const prepared = prepareCustomFieldWriteValue(field, value);
+        if (!prepared.valid) {
+          throw new Error(`O valor "${value}" nao existe nas opcoes do campo "${field.name || field.title || field.displayName || 'personalizado'}" neste projeto do ACC.`);
+        }
+        return {
+          attributeDefinitionId: field.id || field.attributeDefinitionId,
+          value: prepared.value
+        };
+      });
+
+      const updatedIssue = await requestJson(
+        `/api/projects/${encodeURIComponent(selectedProjectId)}/issues/${encodeURIComponent(issue.id)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ customAttributes })
+        }
+      );
+
+      setIssues((currentIssues) =>
+        currentIssues.map((currentIssue) =>
+          currentIssue.id === issue.id ? { ...currentIssue, ...updatedIssue } : currentIssue
+        )
+      );
+      setKanbanColumnMessage(`Marco Contratual atualizado automaticamente no ACC para "${getKanbanColumnLinkLabel(nextColumn)}".`);
+      setKanbanMoveDrafts((current) => {
+        const nextDrafts = { ...current };
+        delete nextDrafts[issue.id];
+        return nextDrafts;
+      });
+      await refreshCurrentModule();
+      setActiveModule('links');
+    } catch (requestError) {
+      setIssues((currentIssues) =>
+        currentIssues.map((currentIssue) =>
+          currentIssue.id === issue.id ? { ...currentIssue, customAttributes: previousCustomAttributes } : currentIssue
+        )
+      );
+      setError(requestError.message);
+    } finally {
+      setKanbanMovingIssueId('');
+    }
   }
 
   async function saveKanbanMoves() {
     const draftEntries = Object.entries(kanbanMoveDrafts);
-    if (!selectedProjectId || !draftEntries.length) return;
-    const approved = window.confirm(`Salvar ${draftEntries.length} movimento(s) do Kanban no ACC?`);
-    if (!approved) return;
-
-    const codigoMarcoField = findCustomFieldDefinition(customFieldDefinitions, CODIGO_MARCO_FIELD_ALIASES);
-    const marcoContratualField = getKanbanMarcoContratualField();
-    const marcoTitleField = getKanbanMarcoTitleField();
-    if (!codigoMarcoField?.id) {
-      setError('Nao encontrei o campo personalizado "Codigo do Marco" para salvar os movimentos.');
+    if (!draftEntries.length) {
+      setKanbanColumnMessage('Os movimentos do Kanban agora são salvos automaticamente no ACC ao soltar o card na coluna.');
       return;
     }
 
     setKanbanSavingMoves(true);
-    setError('');
-    const skippedFields = new Set();
-
     try {
-      await requestJson('/api/auth/keep-alive', { method: 'POST' });
       for (const [issueId, draft] of draftEntries) {
         const issue = issues.find((item) => item.id === issueId);
-        const column = linkKanbanColumns.find((item) => item.id === draft.columnId);
-        if (!issue || !column?.canReceiveCards) continue;
-
-        const updates = [];
-        if (codigoMarcoField?.id && column.code) updates.push({ field: codigoMarcoField, value: column.code });
-        const marcoContratualValue = getKanbanWriteValue(marcoContratualField, [
-          getKanbanColumnLinkLabel(column),
-          column.title,
-          column.code
-        ]);
-        const marcoTitleValue = getKanbanWriteValue(marcoTitleField, [
-          getKanbanColumnLinkLabel(column),
-          column.title,
-          column.code
-        ]);
-
-        if (marcoContratualField?.id && String(marcoContratualField.id) !== String(codigoMarcoField.id) && marcoContratualValue) {
-          updates.push({ field: marcoContratualField, value: marcoContratualValue });
-        }
-        if (
-          marcoTitleField?.id &&
-          String(marcoTitleField.id) !== String(codigoMarcoField.id) &&
-          String(marcoTitleField.id) !== String(marcoContratualField?.id || '') &&
-          marcoTitleValue
-        ) {
-          updates.push({ field: marcoTitleField, value: marcoTitleValue });
-        }
-
-        for (const update of updates) {
-          try {
-            await updateSingleCustomAttribute(issue, update.field, update.value);
-          } catch (requestError) {
-            skippedFields.add(requestError.message);
-          }
-        }
+        if (issue) await moveKanbanCard(issue, draft.columnId);
       }
       setKanbanMoveDrafts({});
-      await refreshCurrentModule();
-      setActiveModule('links');
-      if (skippedFields.size) {
-        setError(`Alguns campos do Kanban nao foram salvos no ACC: ${Array.from(skippedFields).join(' | ')}`);
-      }
-    } catch (requestError) {
-      setError(requestError.message);
     } finally {
       setKanbanSavingMoves(false);
     }
@@ -4000,7 +4479,7 @@ function App() {
     const issue = issues.find((item) => item.id === issueId);
     if (!issue) return;
 
-    moveKanbanCard(issue, column.id);
+    await moveKanbanCard(issue, column.id);
     setSelectedKanbanIssueId(issue.id);
   }
 
@@ -4109,6 +4588,34 @@ function App() {
   }, [schedulePlannerRows, scheduleSelectedRowId]);
 
   useEffect(() => {
+    return () => {
+      if (scheduleAutosaveTimerRef.current) window.clearTimeout(scheduleAutosaveTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeModule !== 'schedule' || !selectedProjectId) return undefined;
+    if (!Object.keys(scheduleEdits).length) {
+      if (!savingSchedule && scheduleAutosaveState !== 'error') {
+        setScheduleAutosaveState('idle');
+        setScheduleAutosaveMessage('');
+      }
+      return undefined;
+    }
+
+    setScheduleAutosaveState((current) => (current === 'saving' ? current : 'pending'));
+    setScheduleAutosaveMessage((current) => current || 'Alterações pendentes. Salvamento automático em andamento.');
+    if (scheduleAutosaveTimerRef.current) window.clearTimeout(scheduleAutosaveTimerRef.current);
+    scheduleAutosaveTimerRef.current = window.setTimeout(() => {
+      saveScheduleChanges({ silent: true, includeSuggestions: false });
+    }, 1200);
+
+    return () => {
+      if (scheduleAutosaveTimerRef.current) window.clearTimeout(scheduleAutosaveTimerRef.current);
+    };
+  }, [activeModule, selectedProjectId, scheduleEdits]);
+
+  useEffect(() => {
     if (cronogramaCurrentPage > cronogramaTotalPages) {
       setCronogramaCurrentPage(cronogramaTotalPages);
     }
@@ -4181,13 +4688,79 @@ function App() {
   }
 
   function editScheduleCell(issueId, field, value) {
-    setScheduleEdits((current) => ({
-      ...current,
-      [issueId]: {
+    const rowForEdit = scheduleRows.find((item) => item.id === issueId);
+
+    if (field === 'predecessor') {
+      const validation = buildSchedulePredecessorValidation(issueId, value, scheduleEdits);
+      if (!validation.valid) {
+        window.alert(validation.message);
+        return;
+      }
+      setScheduleEdits(validation.nextEdits);
+      applyScheduleOrderFromDependencies(validation.nextEdits);
+      return;
+    }
+
+    if (field === 'eapVinculada') {
+      const nextEdits = {
+        ...scheduleEdits,
+        [issueId]: {
+          ...(scheduleEdits[issueId] || {}),
+          eapVinculada: value
+        }
+      };
+      const validation = validateScheduleEapChange(issueId, value, nextEdits);
+      if (!validation.valid) {
+        window.alert(validation.message);
+        return;
+      }
+      setScheduleEdits(nextEdits);
+      applyScheduleOrderFromEap(nextEdits);
+      return;
+    }
+
+    if (field === 'statusEntrega' && rowForEdit) {
+      const dependencyState = getScheduleDependencyState(rowForEdit, scheduleEdits);
+      const nextProgress = getScheduleProgressFromDeliveryStatus(value);
+      const isWaitingStatus = normalizeText(value).includes('aguard') || normalizeText(value).includes('pendente') || !value;
+      if (dependencyState.blocked && nextProgress > 0 && !isWaitingStatus) {
+        window.alert(`${dependencyState.label}. Conclua o predecessor antes de iniciar esta tarefa.`);
+        return;
+      }
+    }
+
+    setScheduleEdits((current) => {
+      let nextIssueEdits = {
         ...(current[issueId] || {}),
         [field]: value
+      };
+
+      if (field === 'statusEntrega') {
+        const row = rowForEdit || scheduleRows.find((item) => item.id === issueId);
+        const previousStatus = current[issueId]?.statusEntrega ?? row?.fields?.statusEntrega ?? '';
+        const statusChanged = normalizeText(previousStatus) !== normalizeText(value);
+        const currentInicioReal = current[issueId]?.inicioReal ?? row?.fields?.inicioReal ?? '';
+        const currentTerminoReal = current[issueId]?.terminoReal ?? row?.fields?.terminoReal ?? '';
+        const todayValue = formatInputDate(new Date());
+
+        if (statusChanged && !currentInicioReal) {
+          nextIssueEdits.inicioReal = todayValue;
+        }
+        if (statusChanged && isScheduleCompletionValue(value) && !currentTerminoReal) {
+          nextIssueEdits.terminoReal = todayValue;
+        }
       }
-    }));
+
+      return {
+        ...current,
+        [issueId]: nextIssueEdits
+      };
+    });
+
+    if (field === 'statusEntrega') {
+      setScheduleAutosaveState('pending');
+      setScheduleAutosaveMessage('Alteração de status pendente de salvamento automático.');
+    }
   }
 
   function editScheduleDependency(row, value) {
@@ -4245,14 +4818,17 @@ function App() {
     return value ?? '';
   }
 
-  async function saveScheduleChanges() {
+  async function saveScheduleChanges(options = {}) {
     if (!selectedProjectId) return;
-    const selectedSuggestions = scheduleFormulaSuggestions;
+    const { silent = false, includeSuggestions = !silent } = options;
+    const selectedSuggestions = includeSuggestions
+      ? scheduleFormulaSuggestions.filter((suggestion) => scheduleFormulaSelections[suggestion.id] !== false)
+      : [];
     const accScheduleEdits = Object.fromEntries(
       Object.entries(scheduleEdits)
         .map(([issueId, changes]) => [
           issueId,
-          Object.fromEntries(Object.entries(changes).filter(([key]) => key !== 'dependencia'))
+          Object.fromEntries(Object.entries(changes).filter(() => true))
         ])
         .filter(([, changes]) => Object.keys(changes).length)
     );
@@ -4266,14 +4842,21 @@ function App() {
     const structuralWarning = missingStructuralDefinitions.length
       ? `\n\nAtenção: não encontrei no ACC estes campos estruturais: ${missingStructuralDefinitions.map((key) => scheduleFieldLabels[key] || scheduleFieldAliases[key]?.[0] || key).join(', ')}. Eles não serão gravados.`
       : '';
-    const approved = window.confirm(`Salvar no CDE/ACC ${manualChangeCount} issue(s) editado(s) e ${selectedSuggestions.length} campo(s) calculado(s)?${structuralWarning}`);
-    if (!approved) return;
+    if (!silent) {
+      const approved = window.confirm(`Salvar no CDE/ACC ${manualChangeCount} issue(s) editado(s) e ${selectedSuggestions.length} campo(s) calculado(s)?${structuralWarning}`);
+      if (!approved) return;
+    }
 
     setSavingSchedule(true);
+    if (silent) {
+      setScheduleAutosaveState('saving');
+      setScheduleAutosaveMessage('Salvando automaticamente no CDE/ACC...');
+    }
     setError('');
     try {
       await requestJson('/api/auth/keep-alive', { method: 'POST' });
       const updatesByIssue = new Map();
+      const issuePatchesByIssue = new Map();
       const skippedInvalidOptionFields = new Set();
       const pushCustomAttribute = (issueId, definition, value) => {
         if (!definition?.id) return;
@@ -4289,6 +4872,21 @@ function App() {
 
       Object.entries(accScheduleEdits).forEach(([issueId, changes]) => {
         Object.entries(changes).forEach(([key, value]) => {
+          if (key === 'title') {
+            if (!issuePatchesByIssue.has(issueId)) issuePatchesByIssue.set(issueId, {});
+            issuePatchesByIssue.get(issueId).title = value || 'Issue sem título';
+            return;
+          }
+          if (key === 'assignedTo') {
+            if (!issuePatchesByIssue.has(issueId)) issuePatchesByIssue.set(issueId, {});
+            issuePatchesByIssue.get(issueId).assignedTo = value || null;
+            if (value) issuePatchesByIssue.get(issueId).assignedToType = 'user';
+            return;
+          }
+          if (key === 'eapVinculada' && value && !/^\d+(\.\d+)*$/.test(String(value).trim())) {
+            skippedInvalidOptionFields.add(`EAP inválida: ${value}`);
+            return;
+          }
           const definition = scheduleFieldDefinitionsByKey[key];
           if (!definition?.id) return;
           pushCustomAttribute(issueId, definition, getScheduleSaveValue(key, value));
@@ -4299,7 +4897,7 @@ function App() {
         pushCustomAttribute(suggestion.issueId, suggestion.definition, getScheduleSaveValue(suggestion.key, suggestion.value));
       });
 
-      if (!updatesByIssue.size) {
+      if (!updatesByIssue.size && !issuePatchesByIssue.size) {
         if (skippedInvalidOptionFields.size) {
           throw new Error(`Nenhuma alteracao foi enviada porque estes valores nao existem nas listas deste projeto do ACC: ${Array.from(skippedInvalidOptionFields).join(', ')}.`);
         }
@@ -4355,10 +4953,23 @@ function App() {
         throw new Error('O ACC recusou todos os campos enviados porque eles estao apagados ou nao mapeados neste projeto.');
       }
 
+      for (const [issueId, patch] of issuePatchesByIssue.entries()) {
+        if (!Object.keys(patch).length) continue;
+        const updatedIssue = await requestJson(`/api/projects/${encodeURIComponent(selectedProjectId)}/issues/${encodeURIComponent(issueId)}`, {
+          method: 'PATCH',
+          body: JSON.stringify(patch)
+        });
+        setIssues((current) => current.map((issue) => (issue.id === issueId ? { ...issue, ...updatedIssue } : issue)));
+      }
+
       setScheduleEdits({});
-      setScheduleFormulaSelections({});
+      if (!silent) setScheduleFormulaSelections({});
       await refreshCurrentModule();
       setActiveModule('schedule');
+      if (silent) {
+        setScheduleAutosaveState('saved');
+        setScheduleAutosaveMessage('Alterações salvas automaticamente.');
+      }
       if (skippedUnmappedFields.size) {
         setError(`Algumas alteracoes foram salvas, mas o ACC recusou estes campos por estarem apagados ou nao mapeados neste projeto: ${Array.from(skippedUnmappedFields).join(', ')}.`);
       } else if (skippedInvalidOptionFields.size) {
@@ -4366,6 +4977,10 @@ function App() {
       }
     } catch (requestError) {
       setError(requestError.message);
+      if (silent) {
+        setScheduleAutosaveState('error');
+        setScheduleAutosaveMessage(requestError.message);
+      }
     } finally {
       setSavingSchedule(false);
     }
@@ -4388,6 +5003,8 @@ function App() {
       dependencia: 'Dependencia',
       progress: 'Avanço calculado',
       delay: 'Dias de atraso',
+      vinculoDependencia: 'Vínculo',
+      assignedTo: 'Atribuído',
       eapVinculada: 'EAP Vinculada',
       codigoMarco: 'Código do Marco',
       marcoContratual: 'Marco Contratual',
@@ -4438,6 +5055,8 @@ function App() {
       dataContratual: ['Data', 'contratual'],
       dataLimiteInterna: ['Data limite', 'interna'],
       statusEntrega: ['Status da', 'entrega'],
+      assignedTo: ['Atribuído'],
+      vinculoDependencia: ['Vínculo'],
       statusCliente: ['Status', 'Cliente'],
       statusAnaliseCliente: ['Status', 'Cliente'],
       dataPublicacao: ['Data', 'Publicação'],
@@ -4548,8 +5167,8 @@ function App() {
       );
       return computedEnd || row.fields.terminoPlanejado || '';
     }
-    if (columnKey === 'eapAuto') return row.eapAuto || '';
-    if (columnKey === 'title') return row.issue.title || 'Issue sem título';
+    if (columnKey === 'eapAuto') return edited.eapVinculada ?? row.eapAuto ?? row.fields.eapVinculada ?? '';
+    if (columnKey === 'title') return edited.title ?? row.issue.title ?? 'Issue sem título';
     if (columnKey === 'typeLabel') return row.typeLabel;
     if (columnKey === 'progress') {
       if (row.isMarco && row.children?.length && edited.statusEntrega === undefined) {
@@ -4566,7 +5185,7 @@ function App() {
       };
       return calculateScheduleDelay(fields, isScheduleCompleted(row.issue, customFieldDefinitions, fields)).days || 0;
     }
-    if (columnKey === 'dependencia') return edited.dependencia ?? row.localDependency ?? 'Nao';
+    if (columnKey === 'dependencia') return edited.dependencia ?? row.localDependency ?? row.fields.dependencia ?? 'Nao';
     if (columnKey === 'predecessor') return resolveSchedulePredecessorDisplayValue(row);
     if (columnKey === 'assignedTo') return edited.assignedTo ?? getKanbanAssignedUserId(row.issue);
     return edited[columnKey] ?? row.fields[columnKey] ?? '';
@@ -4777,6 +5396,37 @@ function App() {
     downloadScheduleCsv(`central-g5-cronograma-msproject-${selectedProject?.name || selectedProjectId || 'projeto'}.csv`, headers, csvRows);
   }
 
+  function renderScheduleDependencyBadge(row) {
+    const state = getScheduleDependencyState(row);
+    return (
+      <span className={`schedule-dependency-badge is-${state.status}`} title={state.detail || state.label}>
+        <strong>{state.label}</strong>
+        {state.detail ? <small>{state.detail}</small> : null}
+      </span>
+    );
+  }
+
+  function renderScheduleAssigneeCell(row) {
+    const value = getScheduleCellValue(row, 'assignedTo');
+    const currentLabel = getScheduleRowOwner(row);
+    const hasCurrentUser = projectUsers.some((projectUser) => String(projectUser.id) === String(value));
+    return (
+      <select
+        className="cronograma-cell-input schedule-cell-input schedule-clean-input"
+        value={value}
+        onChange={(event) => editScheduleCell(row.id, 'assignedTo', event.target.value)}
+      >
+        <option value="">Sem atribuição</option>
+        {value && !hasCurrentUser && <option value={value}>{currentLabel || value}</option>}
+        {projectUsers.map((projectUser) => (
+          <option key={projectUser.id} value={projectUser.id}>
+            {projectUser.name}{projectUser.email ? ` - ${projectUser.email}` : ''}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
   function renderScheduleCell(row, columnKey) {
     if (columnKey === 'progress') {
       const progressValue = Number(String(getScheduleCellValue(row, columnKey)).replace(/[^\d.-]/g, '')) || 0;
@@ -4795,9 +5445,33 @@ function App() {
       return <span className="schedule-calculated-cell">{getScheduleCellValue(row, columnKey) || '-'}</span>;
     }
     if (columnKey === 'eapAuto') {
+      if (scheduleViewMode === 'coordenacao') {
+        return (
+          <input
+            className="cronograma-cell-input schedule-cell-input schedule-clean-input schedule-eap-editor"
+            value={getScheduleCellValue(row, columnKey)}
+            onChange={(event) => editScheduleCell(row.id, 'eapVinculada', event.target.value)}
+            placeholder="EAP"
+          />
+        );
+      }
       return <span className="schedule-eap-code">{getScheduleCellValue(row, columnKey) || '-'}</span>;
     }
     if (columnKey === 'title') {
+      if (scheduleViewMode === 'coordenacao') {
+        return (
+          <span className="schedule-title-cell" style={{ paddingLeft: `${Math.max(0, row.plannerLevel || 0) * 18}px` }}>
+            {row.plannerLevel ? <i aria-hidden="true">↳</i> : null}
+            <em aria-hidden="true" className="schedule-type-icon">{getScheduleRowTypeIcon(row)}</em>
+            <input
+              className="cronograma-cell-input schedule-cell-input schedule-clean-input schedule-title-editor"
+              value={getScheduleCellValue(row, columnKey)}
+              onChange={(event) => editScheduleCell(row.id, 'title', event.target.value)}
+              placeholder="Título"
+            />
+          </span>
+        );
+      }
       return (
         <span className="schedule-title-cell" style={{ paddingLeft: `${Math.max(0, row.plannerLevel || 0) * 18}px` }}>
           {row.plannerLevel ? <i aria-hidden="true">↳</i> : null}
@@ -4805,6 +5479,12 @@ function App() {
           <strong>{getScheduleCellValue(row, columnKey)}</strong>
         </span>
       );
+    }
+    if (columnKey === 'assignedTo') {
+      return renderScheduleAssigneeCell(row);
+    }
+    if (columnKey === 'vinculoDependencia') {
+      return renderScheduleDependencyBadge(row);
     }
     if (columnKey === 'dependencia') {
       return (
@@ -4825,11 +5505,26 @@ function App() {
       const options = ['statusEntrega', 'prioridadeGestao', 'faseFluxo', 'statusCliente'].includes(columnKey)
         ? getScheduleFieldOptions(columnKey)
         : [];
+      if (scheduleViewMode === 'coordenacao' && columnKey === 'predecessor') {
+        const state = getScheduleDependencyState(row);
+        return (
+          <span className="schedule-predecessor-cell">
+            <input
+              className="cronograma-cell-input schedule-cell-input schedule-clean-input"
+              type="text"
+              value={value}
+              onChange={(event) => editScheduleCell(row.id, columnKey, event.target.value)}
+              placeholder="ID"
+            />
+            {value ? <small className={`schedule-predecessor-hint is-${state.status}`}>{state.detail || state.label}</small> : null}
+          </span>
+        );
+      }
       if (options.length || columnKey === 'statusEntrega') {
         const hasCurrentValue = value && !options.some((option) => option.value === value || option.label === value);
         return (
           <select
-            className="cronograma-cell-input schedule-cell-input"
+            className={`cronograma-cell-input schedule-cell-input ${scheduleViewMode === 'coordenacao' ? 'schedule-clean-input' : ''}`}
             value={value}
             disabled={columnKey === 'statusEntrega' && !options.length}
             title={columnKey === 'statusEntrega' && !options.length ? 'As opções deste campo ainda não foram carregadas do ACC.' : undefined}
@@ -4845,7 +5540,7 @@ function App() {
       }
       return (
         <input
-          className="cronograma-cell-input schedule-cell-input"
+          className={`cronograma-cell-input schedule-cell-input ${scheduleViewMode === 'coordenacao' ? 'schedule-clean-input' : ''}`}
           type={isDateColumn ? 'date' : isNumberColumn ? 'number' : 'text'}
           min={isNumberColumn ? '0' : undefined}
           step={isNumberColumn ? '1' : undefined}
@@ -5587,7 +6282,7 @@ function App() {
   }, [customFieldDefinitions]);
 
   const linkKanbanColumns = useMemo(() => {
-    const normalizeKanbanMatch = (value) => normalizeText(value).replace(/[^a-z0-9]+/g, ' ').trim();
+    const normalizeKanbanMatch = normalizeKanbanColumnKey;
     const isEntregaTitleIssue = (issue) => /^entrega\s*-/i.test(String(issue?.title || '').trim());
     const getKanbanMarcoSortParts = (code) => {
       const text = String(code || '').toUpperCase();
@@ -5742,6 +6437,16 @@ function App() {
     };
 
     milestones.forEach((milestone) => registerColumn(milestone));
+    kanbanManualColumns.forEach((column) => registerColumn({
+      ...column,
+      issue: null,
+      title: column.title || column.marcoContratual || column.code || 'Marco Contratual',
+      deliveryTitle: column.deliveryTitle || column.title || column.marcoContratual || column.code || 'Marco Contratual',
+      marcoContratual: column.marcoContratual || column.title || column.deliveryTitle || column.code || 'Marco Contratual',
+      marcoFieldValue: column.marcoFieldValue || column.marcoContratual || column.title || column.code || 'Marco Contratual',
+      canReceiveCards: true,
+      isManual: true
+    }));
 
     const unlinkedCards = [];
     const assignedCardIds = new Set();
@@ -5816,7 +6521,7 @@ function App() {
     }
 
     return columns;
-  }, [issues, filteredLinkFlows, customFieldDefinitions, isLinkFilterActive, kanbanMoveDrafts]);
+  }, [issues, filteredLinkFlows, customFieldDefinitions, isLinkFilterActive, kanbanMoveDrafts, kanbanManualColumns]);
 
   const selectedKanbanIssue = useMemo(
     () => issues.find((issue) => issue.id === selectedKanbanIssueId) || null,
@@ -5851,7 +6556,7 @@ function App() {
     }
 
     setKanbanEditDraft({
-      marcoId: selectedKanbanColumn?.issue ? selectedKanbanColumn.id : '',
+      marcoId: selectedKanbanColumn?.canReceiveCards ? selectedKanbanColumn.id : '',
       title: selectedKanbanIssue.title || '',
       assignedTo: getKanbanAssignedUserId(selectedKanbanIssue),
       followers: getKanbanFollowerIds(selectedKanbanIssue),
@@ -6605,7 +7310,7 @@ function App() {
 
   function handleBusinessUnitSelect(businessUnit) {
     setSelectedBusinessUnit(businessUnit);
-    localStorage.setItem('g5-instrumentos-business-unit', businessUnit);
+    localStorage.setItem('central-g5-business-unit', businessUnit);
     setSelectedHubId('');
     setSelectedProjectId('');
     setSelectedIssueId('');
@@ -6618,8 +7323,8 @@ function App() {
   }
 
   function handleBusinessUnitReset() {
-    setSelectedBusinessUnit('G5 Instrumentos');
-    localStorage.setItem('g5-instrumentos-business-unit', 'G5 Instrumentos');
+    setSelectedBusinessUnit('');
+    localStorage.removeItem('central-g5-business-unit');
     setSelectedHubId('');
     setSelectedProjectId('');
     setSelectedIssueId('');
@@ -6632,7 +7337,7 @@ function App() {
   }
 
   function updateInstrumentResource(resourceKey, field, value) {
-    const cacheKey = `g5-instrumentos-recursos:${selectedProjectId}`;
+    const cacheKey = `central-g5-instrumentos-recursos:${selectedProjectId}`;
     setInstrumentResourceOverrides((current) => {
       const next = {
         ...current,
@@ -7829,8 +8534,8 @@ function exportIssueLinksManagementSheet() {
           <div className="brand-heading">
             <img src="/brand/g5-logo.png" alt="G5 Engenharia e Instrumentos" />
             <div>
-              <p className="eyebrow">Sistema operacional</p>
-              <h1>G5 Instrumentos</h1>
+              <p className="eyebrow">Etapa 2</p>
+              <h1>Central G5</h1>
             </div>
           </div>
         </div>
@@ -7845,8 +8550,8 @@ function exportIssueLinksManagementSheet() {
 
         {!user && (
           <div className="login-panel">
-            <h2>Conectar ao Autodesk Construction Cloud</h2>
-            <p>Entre com sua conta Autodesk para acompanhar obras, equipes, equipamentos, materiais e pendencias.</p>
+            <h2>Conectar ao Autodesk Construction Cloud / Forma</h2>
+            <p>Entre com sua conta Autodesk para acompanhar e controlar issues dos projetos.</p>
             <a className="primary-button" href="/api/auth/login">
               Entrar com Autodesk
             </a>
@@ -7855,9 +8560,9 @@ function exportIssueLinksManagementSheet() {
 
         {user && !selectedBusinessUnit && (
           <section className="business-unit-panel">
-            <p className="eyebrow">G5 Instrumentos</p>
-            <h2>Area operacional de instrumentos</h2>
-            <p>Aplicacao independente para obras, equipes, equipamentos, materiais e pendencias.</p>
+            <p className="eyebrow">Unidade de Negocios</p>
+            <h2>Escolha a area da G5</h2>
+            <p>Esta escolha define quais projetos aparecem e qual interface sera carregada.</p>
             <div className="business-unit-grid">
               {businessUnitOptions.map((unit) => (
                 <button key={unit.value} type="button" className="business-unit-card" onClick={() => handleBusinessUnitSelect(unit.value)}>
@@ -7879,7 +8584,7 @@ function exportIssueLinksManagementSheet() {
               <div className="business-unit-account">
                 <span>Unidade selecionada</span>
                 <strong>{selectedBusinessUnit}</strong>
-                <button type="button" onClick={() => setProjectPickerOpen(true)}>Alterar projeto</button>
+                <button type="button" onClick={handleBusinessUnitReset}>Alterar unidade</button>
               </div>
             </aside>
 
@@ -7942,14 +8647,14 @@ function exportIssueLinksManagementSheet() {
             <div className="section-heading">
               <div>
                 <p className="eyebrow">G5 Instrumentos</p>
-                <h2>Controle de Instrumentos</h2>
+                <h2>Instrumentacao</h2>
                 <p className="selected-project-name">
                   Projeto selecionado: <strong>{selectedProject?.name || selectedProjectId}</strong>
                 </p>
               </div>
               <div className="button-row">
                 <button type="button" className="ghost-button" onClick={() => setProjectPickerOpen(true)}>Trocar projeto</button>
-                <button type="button" className="ghost-button" onClick={() => setProjectPickerOpen(true)}>Alterar projeto</button>
+                <button type="button" className="ghost-button" onClick={handleBusinessUnitReset}>Alterar unidade</button>
                 <button type="button" className="ghost-button" onClick={refreshCurrentModule}>Atualizar</button>
               </div>
             </div>
@@ -7979,7 +8684,7 @@ function exportIssueLinksManagementSheet() {
                     <p className="eyebrow">Controle Integrado de Obras</p>
                     <h3>{instrumentSectionOptions.find((section) => section.id === activeInstrumentSection)?.title || 'Dashboard Geral'}</h3>
                     <p>
-                      Aplicacao gerencial para obras de instrumentacao, equipe, equipamentos, materiais, compras e pendencias usando os Issues visiveis do ACC.
+                      Central gerencial para obras de instrumentacao, equipe, equipamentos, materiais, compras e pendencias usando os Issues visiveis do ACC.
                     </p>
                   </div>
                   <strong>{instrumentationIssues.length} issues encontrados</strong>
@@ -8906,66 +9611,93 @@ function exportIssueLinksManagementSheet() {
                   <span>{issues.length} issues no projeto</span>
                 </div>
 
-                <form className="kanban-create-panel" onSubmit={createKanbanCard}>
-                  <div className="kanban-create-heading">
-                    <div>
-                      <p className="eyebrow">Novo card / nova tarefa</p>
-                      <h4>Criar issue de Interface e Coordenação Multidisciplinar</h4>
+                <div className="kanban-quick-actions" aria-label="Ações rápidas do Kanban">
+                  <form className="kanban-create-panel kanban-column-panel kanban-compact-panel" onSubmit={createKanbanMarcoColumn}>
+                    <div className="kanban-create-heading">
+                      <div>
+                        <p className="eyebrow">Nova coluna</p>
+                        <h4>Criar Marco Contratual</h4>
+                        <span>Cria a coluna do quadro e usa o valor para gravar o campo Marco Contratual ao mover cards.</span>
+                      </div>
+                      <button className="primary-button" type="submit">
+                        Criar coluna
+                      </button>
                     </div>
-                    <button className="primary-button" type="submit" disabled={kanbanCreating}>
-                      {kanbanCreating ? 'Criando...' : 'Criar card no ACC'}
-                    </button>
-                  </div>
-                  <div className="kanban-create-grid">
-                    <label>
-                      Entrega *
-                      <select value={kanbanDraft.marcoId} onChange={(event) => updateKanbanDraft('marcoId', event.target.value)} required>
-                        <option value="">Selecione um marco</option>
-                        {linkKanbanColumns.filter((column) => column.canReceiveCards).map((column) => (
-                          <option key={column.id} value={column.id}>{getKanbanColumnOptionLabel(column)}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Tipo do issue *
-                      <select value={kanbanDraft.type} onChange={(event) => updateKanbanDraft('type', event.target.value)} required>
-                        {kanbanIssueTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-                      </select>
-                    </label>
-                    <label className="wide-field">
-                      Título *
-                      <input value={kanbanDraft.title} onChange={(event) => updateKanbanDraft('title', event.target.value)} placeholder="Ex.: Validar interferência entre disciplinas" required />
-                    </label>
-                    <label>
-                      Responsável / atribuído *
-                      <select value={kanbanDraft.assignedTo} onChange={(event) => updateKanbanDraft('assignedTo', event.target.value)} required>
-                        <option value="">Selecione</option>
-                        {projectUsers.map((projectUser) => (
-                          <option key={projectUser.id} value={projectUser.id}>
-                            {projectUser.name}{projectUser.email ? ` - ${projectUser.email}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Data prevista / limite *
-                      <input type="date" value={kanbanDraft.dueDate} onChange={(event) => updateKanbanDraft('dueDate', event.target.value)} required />
-                    </label>
-                    <label>
-                      Disciplina envolvida *
-                      <select value={kanbanDraft.disciplina} onChange={(event) => updateKanbanDraft('disciplina', event.target.value)} required>
-                        <option value="">Selecione</option>
-                        {kanbanDisciplineOptions.map((option) => (
-                          <option key={option.id} value={option.id}>{option.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="wide-field">
-                      Descrição
-                      <textarea value={kanbanDraft.description} onChange={(event) => updateKanbanDraft('description', event.target.value)} placeholder="Contexto, pendência, decisão esperada ou disciplinas envolvidas." />
-                    </label>
-                  </div>
-                </form>
+                    <div className="kanban-create-grid kanban-column-create-grid">
+                      <label className="wide-field">
+                        Marco Contratual *
+                        <input value={kanbanColumnDraft.title} onChange={(event) => updateKanbanColumnDraft('title', event.target.value)} placeholder="Ex.: Marco - Desenvolvimento do Projeto Básico" required />
+                      </label>
+                      <label>
+                        Código do Marco
+                        <input value={kanbanColumnDraft.code} onChange={(event) => updateKanbanColumnDraft('code', event.target.value)} placeholder="Ex.: M03" />
+                      </label>
+                    </div>
+                    {kanbanColumnMessage && <p className="kanban-column-message">{kanbanColumnMessage}</p>}
+                  </form>
+
+                  <form className="kanban-create-panel kanban-card-create-panel kanban-compact-panel" onSubmit={createKanbanCard}>
+                    <div className="kanban-create-heading">
+                      <div>
+                        <p className="eyebrow">Novo card</p>
+                        <h4>Criar issue no ACC</h4>
+                        <span>Registra uma nova pendência de Interface e Coordenação Multidisciplinar.</span>
+                      </div>
+                      <button className="primary-button" type="submit" disabled={kanbanCreating}>
+                        {kanbanCreating ? 'Criando...' : 'Criar card'}
+                      </button>
+                    </div>
+                    <div className="kanban-create-grid">
+                      <label>
+                        Marco Contratual *
+                        <select value={kanbanDraft.marcoId} onChange={(event) => updateKanbanDraft('marcoId', event.target.value)} required>
+                          <option value="">Selecione um Marco Contratual</option>
+                          {linkKanbanColumns.filter((column) => column.canReceiveCards).map((column) => (
+                            <option key={column.id} value={column.id}>{getKanbanColumnOptionLabel(column)}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Tipo do issue *
+                        <select value={kanbanDraft.type} onChange={(event) => updateKanbanDraft('type', event.target.value)} required>
+                          {kanbanIssueTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                        </select>
+                      </label>
+                      <label className="wide-field">
+                        Título *
+                        <input value={kanbanDraft.title} onChange={(event) => updateKanbanDraft('title', event.target.value)} placeholder="Ex.: Validar interferência entre disciplinas" required />
+                      </label>
+                      <label>
+                        Responsável *
+                        <select value={kanbanDraft.assignedTo} onChange={(event) => updateKanbanDraft('assignedTo', event.target.value)} required>
+                          <option value="">Selecione</option>
+                          {projectUsers.map((projectUser) => (
+                            <option key={projectUser.id} value={projectUser.id}>
+                              {projectUser.name}{projectUser.email ? ` - ${projectUser.email}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Data prevista *
+                        <input type="date" value={kanbanDraft.dueDate} onChange={(event) => updateKanbanDraft('dueDate', event.target.value)} required />
+                      </label>
+                      <label>
+                        Disciplina *
+                        <select value={kanbanDraft.disciplina} onChange={(event) => updateKanbanDraft('disciplina', event.target.value)} required>
+                          <option value="">Selecione</option>
+                          {kanbanDisciplineOptions.map((option) => (
+                            <option key={option.id} value={option.id}>{option.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="wide-field kanban-description-field">
+                        Descrição
+                        <textarea value={kanbanDraft.description} onChange={(event) => updateKanbanDraft('description', event.target.value)} placeholder="Contexto, pendência, decisão esperada ou disciplinas envolvidas." />
+                      </label>
+                    </div>
+                  </form>
+                </div>
 
                 <div className="link-flow-filters">
                   <label>
@@ -9017,14 +9749,7 @@ function exportIssueLinksManagementSheet() {
                   <button className="ghost-button" type="button" onClick={() => refreshCurrentModule()}>
                     Atualizar quadro
                   </button>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={saveKanbanMoves}
-                    disabled={kanbanSavingMoves || !Object.keys(kanbanMoveDrafts).length}
-                  >
-                    {kanbanSavingMoves ? 'Salvando...' : `Salvar movimentos (${Object.keys(kanbanMoveDrafts).length})`}
-                  </button>
+                  <span className="kanban-autosave-badge">Salvamento automático no ACC</span>
                   <button className="ghost-button" type="button" onClick={exportIssueLinksManagementSheet}>
                     <UiIcon name="export" /> Exportar planilha de gerenciamento
                   </button>
@@ -9057,7 +9782,7 @@ function exportIssueLinksManagementSheet() {
 
                     <div className="kanban-drag-instructions">
                       <strong>Movimentação no quadro:</strong>
-                      <span>arraste o card para outra coluna de entrega. Depois clique em <b>Salvar movimentos</b> para gravar o novo Marco Contratual no ACC.</span>
+                      <span>arraste o card para uma coluna de Marco Contratual. Ao soltar, o campo personalizado <b>Marco Contratual</b> será gravado automaticamente no ACC.</span>
                     </div>
 
                     <div className="kanban-board" aria-label="Quadro Kanban de atividades por entrega">
@@ -9088,6 +9813,9 @@ function exportIssueLinksManagementSheet() {
                               {column.issue && column.title && normalizeText(column.title) !== normalizeText(column.marcoContratual || '') && (
                                 <em>{column.title}</em>
                               )}
+                              {column.isManual && !column.cards.length && (
+                                <button className="kanban-column-remove" type="button" onClick={() => removeKanbanManualColumn(column.id)}>Remover coluna</button>
+                              )}
                             </div>
                             <div className="kanban-column-kpis">
                               <b>{column.cards.length}</b>
@@ -9106,7 +9834,7 @@ function exportIssueLinksManagementSheet() {
                                     key={issue.id}
                                     className={`kanban-card ${isOverdue(issue) ? 'is-overdue' : ''} ${!isOpenIssue(issue) ? 'is-closed' : ''} ${selectedKanbanIssueId === issue.id ? 'is-selected' : ''} ${kanbanDraggedIssueId === issue.id ? 'is-dragging' : ''}`}
                                     style={{ '--discipline-color': getDisciplineColor(discipline) }}
-                                    draggable={Boolean(column.canReceiveCards)}
+                                    draggable={Boolean(issue.id)}
                                     onClick={() => setSelectedKanbanIssueId(issue.id)}
                                     onDragStart={(event) => handleKanbanDragStart(event, issue)}
                                     onDragEnd={handleKanbanDragEnd}
@@ -9121,17 +9849,16 @@ function exportIssueLinksManagementSheet() {
                                     >
                                       <span className="kanban-type">{issue.issueType || issue.issueSubtype || 'Sem tipo'}</span>
                                       <strong>{issue.title}</strong>
-                                      <small>{issue.displayId || issue.id}</small>
                                     </button>
                                     <div className="kanban-card-meta">
-                                      <span><i /> {discipline || 'Sem disciplina'}</span>
-                                      <span>{issue.status || 'Sem status'}</span>
-                                      <span>{issue.assignedTo || 'Sem responsavel'}</span>
-                                      <span>{issue.dueDate ? formatDate(issue.dueDate) : 'Sem prazo'}</span>
+                                      <span className="kanban-discipline-chip"><i /> {discipline || 'Sem disciplina'}</span>
+                                      <span className="kanban-status-chip">{getIssueStatusLabel(issue.status)}</span>
+                                      <span className="kanban-assignee-name">{issue.assignedTo || 'Sem responsável'}</span>
+                                      <span className="kanban-date-chip">{issue.dueDate ? formatDate(issue.dueDate) : 'Sem prazo'}</span>
                                     </div>
                                     <div className="kanban-card-footer">
                                       {isOverdue(issue) && <span className="kanban-alert">Atrasada</span>}
-                                      {column.canReceiveCards && <span className="kanban-drag-hint">Arraste para mover</span>}
+                                      <span className="kanban-drag-hint">{kanbanMovingIssueId === issue.id ? 'Salvando no ACC...' : 'Arraste para mover'}</span>
                                     </div>
                                   </article>
                                 );
@@ -11434,7 +12161,7 @@ function exportIssueLinksManagementSheet() {
             )}
 
             {activeModule === 'schedule' && (
-              <section className="panel-card eap-module-card schedule-module-card">
+              <section className={`panel-card eap-module-card schedule-module-card ${scheduleViewMode === 'coordenacao' ? 'is-coordination-mode' : ''}`}>
                 <div className="eap-module-header">
                   <div>
                     <p className="eyebrow">VISÃO GERAL</p>
@@ -11664,6 +12391,9 @@ function exportIssueLinksManagementSheet() {
                 <section className="schedule-spreadsheet-panel">
                 <div className="schedule-planner-toolbar" aria-label="Comandos da planilha da visão geral do projeto">
                   <span className="schedule-toolbar-title">Planilha do cronograma</span>
+                  <span className={`schedule-autosave-badge is-${scheduleAutosaveState}`} title={scheduleAutosaveMessage || 'Salvamento automático semelhante ao Kanban'}>
+                    {savingSchedule && scheduleAutosaveState === 'saving' ? 'Salvando...' : scheduleAutosaveState === 'error' ? 'Erro no autosave' : scheduleAutosaveState === 'saved' ? 'Salvo automaticamente' : scheduleAutosaveState === 'pending' ? 'Autosave pendente' : 'Autosave ativo'}
+                  </span>
                   <button type="button" onClick={() => createScheduleIssue({
                     category: 'Gestão de Entregas',
                     type: 'Marco Contratual / Entrega',
@@ -11730,7 +12460,7 @@ function exportIssueLinksManagementSheet() {
                       {schedulePlannerRows.map((row) => (
                         <tr
                           key={row.id}
-                          className={`${row.isMarco ? 'marco-row' : ''} ${scheduleRowHighlights[row.id] === 'deliverableTitle' ? 'deliverable-title-row' : ''} ${row.linkWarning ? 'schedule-warning-row' : ''} ${scheduleSelectedRowId === row.id ? 'selected-schedule-row' : ''}`}
+                          className={`${row.isMarco ? 'marco-row' : ''} ${scheduleRowHighlights[row.id] === 'deliverableTitle' ? 'deliverable-title-row' : ''} ${row.linkWarning ? 'schedule-warning-row' : ''} ${getScheduleDependencyState(row).blocked ? 'schedule-blocked-row' : ''} ${getScheduleDependencyState(row).released ? 'schedule-released-row' : ''} ${scheduleSelectedRowId === row.id ? 'selected-schedule-row' : ''}`}
                           onClick={() => selectScheduleRow(row.id)}
                         >
                           {scheduleColumns.map((column) => <td key={`${row.id}:${column}`} className={getScheduleColumnClassName(column)}>{renderScheduleCell(row, column)}</td>)}
@@ -12266,7 +12996,7 @@ function exportIssueLinksManagementSheet() {
             >
               <div className="app-alert-titlebar">
                 <div>
-                  <p className="eyebrow">Alerta do G5 Instrumentos</p>
+                  <p className="eyebrow">Alerta do Central G5</p>
                   <h3 id="app-alert-title">Atenção: ação não concluída</h3>
                 </div>
                 <button
