@@ -6670,6 +6670,45 @@ option {
   text-transform: uppercase;
 }
 
+.schedule-autosave-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid rgba(35, 139, 107, 0.2);
+  border-radius: 6px;
+  color: #0f5f69;
+  background: rgba(235, 249, 246, 0.92);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.schedule-autosave-badge.is-pending {
+  border-color: rgba(215, 140, 20, 0.28);
+  color: #8a5a11;
+  background: rgba(255, 245, 224, 0.96);
+}
+
+.schedule-autosave-badge.is-saving {
+  border-color: rgba(14, 133, 170, 0.28);
+  color: #0c5c7b;
+  background: rgba(234, 247, 252, 0.96);
+}
+
+.schedule-autosave-badge.is-saved {
+  border-color: rgba(35, 139, 107, 0.28);
+  color: #126046;
+  background: rgba(234, 249, 241, 0.96);
+}
+
+.schedule-autosave-badge.is-error {
+  border-color: rgba(210, 63, 63, 0.28);
+  color: #8f1f1f;
+  background: rgba(255, 238, 238, 0.96);
+}
+
 .schedule-toolbar-divider {
   width: 100%;
   height: 0;
@@ -8638,4 +8677,952 @@ option {
 .eap-readonly-wrapper,
 .eap-wide-table-wrapper {
   overflow-x: auto;
+}
+
+.kanban-column-panel {
+  border-color: rgba(14, 133, 170, 0.22);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(238, 249, 249, 0.86));
+}
+
+.kanban-create-heading span {
+  display: block;
+  margin-top: 4px;
+  max-width: 760px;
+  color: #536a61;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.kanban-column-create-grid {
+  grid-template-columns: minmax(220px, 2fr) minmax(120px, 0.7fr);
+}
+
+.kanban-column-message {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(14, 133, 170, 0.16);
+  border-radius: 8px;
+  color: #31555f;
+  background: rgba(235, 249, 251, 0.78);
+  font-size: 0.82rem;
+}
+
+.kanban-autosave-badge {
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid rgba(35, 139, 107, 0.2);
+  border-radius: 6px;
+  color: #0f5f69;
+  background: rgba(235, 249, 246, 0.92);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.kanban-column-remove {
+  justify-self: start;
+  width: fit-content;
+  margin-top: 2px;
+  padding: 3px 8px;
+  border: 1px solid rgba(206, 80, 56, 0.22);
+  border-radius: 999px;
+  color: #9d3d28;
+  background: #fff8f5;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kanban-column-remove:hover {
+  border-color: rgba(206, 80, 56, 0.46);
+  background: #ffe9e1;
+}
+
+@media (max-width: 860px) {
+  .kanban-column-create-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Kanban de Marcos - layout executivo compacto */
+.workspace.workspace-operational .module-panel,
+.workspace:has(.module-panel:not(:has(.module-grid))) .module-panel {
+  padding-inline: clamp(16px, 1.45vw, 28px);
+}
+
+.link-flow-panel {
+  gap: 12px;
+}
+
+.link-flow-panel .link-flow-intro {
+  min-height: 64px;
+  padding: 12px 18px;
+  border-top: 3px solid var(--g5-blue-deep);
+  background:
+    url("/brand/g5-logo.png") 66% center / 150px auto no-repeat,
+    linear-gradient(135deg, rgba(25, 83, 96, 0.06), rgba(118, 178, 124, 0.06)),
+    rgba(255, 255, 255, 0.9);
+}
+
+.link-flow-panel .link-flow-intro h3 {
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+}
+
+.kanban-quick-actions {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.82fr) minmax(620px, 1.18fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.kanban-compact-panel {
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(25, 83, 96, 0.06);
+}
+
+.kanban-compact-panel .kanban-create-heading {
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(25, 83, 96, 0.08);
+}
+
+.kanban-compact-panel .kanban-create-heading h4 {
+  font-size: 0.92rem;
+}
+
+.kanban-compact-panel .kanban-create-heading span {
+  margin-top: 2px;
+  max-width: 560px;
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+.kanban-compact-panel .primary-button {
+  min-width: 106px;
+  min-height: 32px;
+  margin-top: 0;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.kanban-quick-actions .kanban-create-grid {
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+  gap: 7px 10px;
+}
+
+.kanban-quick-actions .kanban-column-create-grid {
+  grid-template-columns: minmax(220px, 1fr) minmax(105px, 0.42fr);
+}
+
+.kanban-quick-actions .kanban-card-create-panel .kanban-create-grid {
+  grid-template-columns: minmax(160px, 1.2fr) minmax(130px, 0.8fr) minmax(260px, 1.7fr) minmax(140px, 0.9fr) minmax(132px, 0.82fr) minmax(132px, 0.82fr);
+}
+
+.kanban-quick-actions .kanban-create-grid .wide-field {
+  grid-column: auto;
+}
+
+.kanban-quick-actions .kanban-description-field {
+  display: none;
+}
+
+.kanban-quick-actions .kanban-create-grid label {
+  gap: 4px;
+  font-size: 0.74rem;
+  line-height: 1.2;
+}
+
+.kanban-quick-actions .kanban-create-grid input,
+.kanban-quick-actions .kanban-create-grid select,
+.kanban-quick-actions .kanban-create-grid textarea,
+.link-flow-filters select,
+.link-flow-filters input {
+  min-height: 31px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+.kanban-column-message {
+  padding: 6px 8px;
+  font-size: 0.74rem;
+}
+
+.link-flow-filters {
+  grid-template-columns: minmax(115px, 0.8fr) minmax(115px, 0.8fr) minmax(115px, 0.7fr) minmax(130px, 0.8fr) minmax(140px, 0.9fr) minmax(150px, 0.9fr) minmax(145px, 0.9fr) minmax(170px, 1fr) minmax(185px, 1fr);
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.link-flow-filters label {
+  gap: 3px;
+  font-size: 0.74rem;
+}
+
+.link-flow-filters .ghost-button,
+.kanban-autosave-badge {
+  min-height: 31px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+
+.kanban-discipline-legend {
+  gap: 5px;
+  padding: 7px 9px;
+}
+
+.kanban-discipline-legend span {
+  padding: 3px 7px;
+  font-size: 0.72rem;
+}
+
+.kanban-discipline-legend i,
+.kanban-card-meta i {
+  width: 8px;
+  height: 8px;
+}
+
+.kanban-drag-instructions {
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 0.78rem;
+}
+
+.kanban-board {
+  gap: 10px;
+  min-height: calc(100vh - 430px);
+  padding: 6px 2px 14px;
+}
+
+.kanban-column {
+  flex-basis: 248px;
+  max-height: calc(100vh - 410px);
+  border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(25, 83, 96, 0.06);
+}
+
+.kanban-column-header {
+  gap: 6px;
+  padding: 9px 10px;
+  border-top-width: 3px;
+  border-radius: 10px 10px 0 0;
+}
+
+.kanban-column-header .kanban-column-code {
+  padding: 2px 7px;
+  font-size: 0.7rem;
+}
+
+.kanban-column-header h4 {
+  margin-top: 2px;
+  font-size: 0.86rem;
+  line-height: 1.22;
+}
+
+.kanban-column-header small,
+.kanban-column-header em {
+  font-size: 0.7rem;
+}
+
+.kanban-column-kpis b {
+  font-size: 1.15rem;
+}
+
+.kanban-column-kpis small {
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.kanban-card-list {
+  gap: 7px;
+  padding: 8px;
+}
+
+.kanban-empty {
+  padding: 14px 10px;
+  font-size: 0.78rem;
+}
+
+.kanban-card {
+  gap: 6px;
+  padding: 8px 8px 8px 10px;
+  border-left-width: 4px;
+  border-radius: 8px;
+  box-shadow: 0 6px 14px rgba(25, 83, 96, 0.055);
+}
+
+.kanban-card-main {
+  gap: 4px;
+}
+
+.kanban-card-main strong {
+  font-size: 0.82rem;
+  line-height: 1.22;
+}
+
+.kanban-type {
+  padding: 2px 7px;
+  font-size: 0.64rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 6px;
+  align-items: center;
+  font-size: 0.69rem;
+}
+
+.kanban-card-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.kanban-discipline-chip,
+.kanban-status-chip,
+.kanban-date-chip {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(237, 246, 247, 0.9);
+}
+
+.kanban-status-chip {
+  color: #8a5b00;
+  background: #fff1c7;
+  font-weight: 700;
+}
+
+.kanban-date-chip {
+  color: #31555f;
+  background: rgba(235, 249, 251, 0.95);
+}
+
+.kanban-assignee-name {
+  flex-basis: 100%;
+  color: #52685f;
+  font-weight: 600;
+}
+
+.kanban-card-footer {
+  gap: 5px;
+}
+
+.kanban-alert,
+.kanban-drag-hint {
+  padding: 2px 7px;
+  font-size: 0.66rem;
+}
+
+.kanban-card-editor {
+  display: none;
+}
+
+@media (min-width: 1600px) {
+  .kanban-column {
+    flex-basis: 265px;
+  }
+}
+
+@media (max-width: 1240px) {
+  .kanban-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .kanban-quick-actions .kanban-card-create-panel .kanban-create-grid,
+  .link-flow-filters {
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .kanban-quick-actions .kanban-column-create-grid,
+  .kanban-quick-actions .kanban-card-create-panel .kanban-create-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kanban-quick-actions .kanban-description-field {
+    display: grid;
+  }
+
+  .kanban-column {
+    flex-basis: 82vw;
+  }
+}
+
+/* Visão de Coordenação - cronograma visual e edição limpa */
+.schedule-module-card.is-coordination-mode .schedule-table td {
+  vertical-align: middle;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-clean-input {
+  width: 100%;
+  min-height: 26px;
+  border-color: transparent;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-clean-input:hover,
+.schedule-module-card.is-coordination-mode .schedule-clean-input:focus {
+  border-color: rgba(14, 133, 170, 0.28);
+  background: rgba(255, 255, 255, 0.86);
+  outline: none;
+}
+
+.schedule-eap-editor {
+  max-width: 84px;
+  text-align: center;
+  color: #075b66;
+}
+
+.schedule-title-editor {
+  min-width: 220px;
+  color: #12343b;
+}
+
+.schedule-predecessor-cell {
+  display: grid;
+  gap: 2px;
+  min-width: 110px;
+}
+
+.schedule-predecessor-cell input {
+  text-align: center;
+}
+
+.schedule-predecessor-hint {
+  display: block;
+  max-width: 160px;
+  overflow: hidden;
+  color: #527078;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-predecessor-hint.is-blocked,
+.schedule-predecessor-hint.is-missing {
+  color: #9b2c2c;
+}
+
+.schedule-predecessor-hint.is-released {
+  color: #176b4d;
+}
+
+.schedule-dependency-badge {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 150px;
+  max-width: 230px;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid rgba(9, 91, 103, 0.14);
+  border-radius: 8px;
+  background: rgba(246, 250, 250, 0.9);
+  color: #31565e;
+  line-height: 1.15;
+}
+
+.schedule-dependency-badge strong {
+  overflow: hidden;
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-dependency-badge small {
+  overflow: hidden;
+  margin-top: 2px;
+  color: inherit;
+  font-size: 0.66rem;
+  opacity: 0.78;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-dependency-badge.is-blocked,
+.schedule-dependency-badge.is-missing {
+  border-color: rgba(210, 70, 70, 0.24);
+  background: rgba(255, 240, 240, 0.94);
+  color: #923434;
+}
+
+.schedule-dependency-badge.is-released {
+  border-color: rgba(35, 139, 107, 0.24);
+  background: rgba(235, 249, 242, 0.94);
+  color: #176b4d;
+}
+
+.schedule-dependency-badge.is-info {
+  border-color: rgba(14, 133, 170, 0.2);
+  background: rgba(238, 249, 252, 0.94);
+  color: #0c5d72;
+}
+
+.schedule-dependency-badge.is-none {
+  color: #6b7a80;
+  background: rgba(248, 250, 250, 0.72);
+}
+
+.schedule-table tr.schedule-blocked-row .schedule-title-cell strong,
+.schedule-table tr.schedule-blocked-row .schedule-title-editor {
+  color: #7f2f2f;
+}
+
+/* Ajustes solicitados - coordenação do cronograma */
+.schedule-module-card.is-coordination-mode .schedule-table {
+  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table th,
+.schedule-module-card.is-coordination-mode .schedule-table td {
+  max-width: none;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table thead th {
+  resize: horizontal;
+  overflow: auto;
+  min-width: 86px;
+}
+
+.schedule-mark-toolbar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border: 1px solid rgba(9, 91, 103, 0.13);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.schedule-mark-toolbar > span {
+  padding: 0 4px;
+  color: #0f616d;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.schedule-planner-toolbar .mark-color-button {
+  min-height: 26px;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.mark-color-button.is-highlightBlue {
+  border-color: rgba(37, 99, 235, 0.26);
+  color: #1e3a8a;
+  background: #e6f0ff;
+}
+
+.mark-color-button.is-highlightPastel {
+  border-color: rgba(190, 152, 93, 0.28);
+  color: #745328;
+  background: #fff4df;
+}
+
+.mark-color-button.is-highlightPurple {
+  border-color: rgba(124, 58, 237, 0.25);
+  color: #5b21b6;
+  background: #f1e8ff;
+}
+
+.mark-color-button.is-highlightRed {
+  border-color: rgba(220, 38, 38, 0.25);
+  color: #991b1b;
+  background: #ffe8e8;
+}
+
+.mark-color-button.is-highlightGreen {
+  border-color: rgba(22, 163, 74, 0.25);
+  color: #166534;
+  background: #e7f8ee;
+}
+
+.mark-color-button.is-highlightYellow {
+  border-color: rgba(202, 138, 4, 0.25);
+  color: #854d0e;
+  background: #fff7c8;
+}
+
+.schedule-table tr.schedule-closed-row td,
+.schedule-table tr.schedule-completed-row td {
+  background: transparent !important;
+  color: rgba(22, 73, 58, 0.52);
+}
+
+.schedule-table tr.schedule-closed-row td.schedule-sticky-col,
+.schedule-table tr.schedule-completed-row td.schedule-sticky-col {
+  background: rgba(248, 252, 250, 0.82) !important;
+}
+
+.schedule-table tr.schedule-closed-row td:first-child,
+.schedule-table tr.schedule-completed-row td:first-child {
+  box-shadow: inset 4px 0 rgba(34, 163, 102, 0.42);
+}
+
+.schedule-table tr.schedule-closed-row .schedule-eap-editor,
+.schedule-table tr.schedule-completed-row .schedule-eap-editor,
+.schedule-table tr.schedule-closed-row .schedule-title-editor,
+.schedule-table tr.schedule-completed-row .schedule-title-editor,
+.schedule-table tr.schedule-closed-row select,
+.schedule-table tr.schedule-completed-row select,
+.schedule-table tr.schedule-closed-row input,
+.schedule-table tr.schedule-completed-row input {
+  color: rgba(22, 73, 58, 0.58) !important;
+}
+
+.schedule-table tr.schedule-overdue-row td,
+.schedule-table tr.schedule-overdue-row input,
+.schedule-table tr.schedule-overdue-row select,
+.schedule-table tr.schedule-overdue-row .schedule-title-cell strong,
+.schedule-table tr.schedule-overdue-row .schedule-title-editor {
+  color: #b42318 !important;
+}
+
+.schedule-table tr.schedule-overdue-row td:first-child {
+  box-shadow: inset 4px 0 #e03131;
+}
+
+.schedule-table tr.schedule-highlight-highlightBlue td,
+.schedule-table tr.schedule-highlight-highlightBlue td.schedule-sticky-col {
+  background: #e7f0ff !important;
+}
+
+.schedule-table tr.schedule-highlight-highlightBlue td:first-child {
+  box-shadow: inset 4px 0 #2563eb;
+}
+
+.schedule-table tr.schedule-highlight-highlightPastel td,
+.schedule-table tr.schedule-highlight-highlightPastel td.schedule-sticky-col {
+  background: #fff3df !important;
+}
+
+.schedule-table tr.schedule-highlight-highlightPastel td:first-child {
+  box-shadow: inset 4px 0 #d6a64a;
+}
+
+.schedule-table tr.schedule-highlight-highlightPurple td,
+.schedule-table tr.schedule-highlight-highlightPurple td.schedule-sticky-col {
+  background: #f2eaff !important;
+}
+
+.schedule-table tr.schedule-highlight-highlightPurple td:first-child {
+  box-shadow: inset 4px 0 #7c3aed;
+}
+
+.schedule-table tr.schedule-highlight-highlightRed td,
+.schedule-table tr.schedule-highlight-highlightRed td.schedule-sticky-col {
+  background: #ffe9e9 !important;
+}
+
+.schedule-table tr.schedule-highlight-highlightRed td:first-child {
+  box-shadow: inset 4px 0 #dc2626;
+}
+
+.schedule-table tr.schedule-highlight-highlightGreen td,
+.schedule-table tr.schedule-highlight-highlightGreen td.schedule-sticky-col {
+  background: #e8f8ef !important;
+}
+
+.schedule-table tr.schedule-highlight-highlightGreen td:first-child {
+  box-shadow: inset 4px 0 #16a34a;
+}
+
+.schedule-table tr.schedule-highlight-highlightYellow td,
+.schedule-table tr.schedule-highlight-highlightYellow td.schedule-sticky-col {
+  background: #fff8c8 !important;
+}
+
+.schedule-table tr.schedule-highlight-highlightYellow td:first-child {
+  box-shadow: inset 4px 0 #eab308;
+}
+
+.schedule-table tr.schedule-blocked-row:not(.schedule-closed-row):not(.schedule-completed-row) td {
+  background: rgba(255, 247, 247, 0.82) !important;
+}
+
+.schedule-table tr.schedule-released-row:not(.schedule-closed-row):not(.schedule-completed-row) td {
+  background: rgba(244, 252, 248, 0.66) !important;
+}
+
+/* Ajustes adicionais - Visão de Coordenação */
+.schedule-module-card.is-coordination-mode .schedule-table th,
+.schedule-module-card.is-coordination-mode .schedule-table td {
+  max-width: none !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table thead th {
+  resize: none;
+  position: sticky;
+  overflow: visible;
+}
+
+.schedule-column-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 8px;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 30;
+}
+
+.schedule-column-resizer:hover,
+body.is-resizing-schedule-column .schedule-column-resizer {
+  background: rgba(9, 91, 103, 0.16);
+}
+
+body.is-resizing-schedule-column {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.schedule-eap-edit-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.schedule-eap-completed-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  color: #0b7a4b;
+  background: rgba(220, 252, 231, 0.95);
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-col-issueStatus {
+  min-width: 146px;
+  width: 146px;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-col-vinculoDependencia {
+  min-width: 210px;
+  width: 210px;
+}
+
+
+/* Revisão coordenação: largura manual, status nativo e leitura por EAP */
+.schedule-module-card.is-coordination-mode .schedule-table {
+  table-layout: fixed !important;
+  width: max-content;
+  min-width: 100%;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table th {
+  position: sticky;
+}
+
+.schedule-column-resizer {
+  width: 12px;
+  right: -6px;
+}
+
+/* Correção: visual da Visão de Coordenação baseado apenas no Status nativo do Issue */
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-closed-row td,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-closed-row td.schedule-sticky-col,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row td,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row td.schedule-sticky-col,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-released-row td,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-blocked-row td {
+  background: transparent !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row td,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row input,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row select,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row .schedule-title-cell,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row .schedule-title-cell strong {
+  color: rgba(15, 109, 77, 0.58) !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row td:first-child {
+  box-shadow: inset 3px 0 rgba(22, 163, 74, 0.7) !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-overdue-row td,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-overdue-row input,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-overdue-row select,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-overdue-row .schedule-title-cell,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-overdue-row .schedule-title-cell strong {
+  color: #b42318 !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-overdue-row td:first-child {
+  box-shadow: inset 3px 0 #dc2626 !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-eap-completed-icon {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  color: #118451 !important;
+  opacity: 1 !important;
+}
+
+
+.schedule-undo-button,
+.schedule-undo-inline {
+  border-color: rgba(9, 91, 103, 0.28) !important;
+  color: #074f5b !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  font-weight: 700;
+}
+
+.schedule-undo-button:not(:disabled):hover,
+.schedule-undo-inline:not(:disabled):hover {
+  border-color: #0d7886 !important;
+  background: #eef9f7 !important;
+}
+
+.schedule-undo-button:disabled,
+.schedule-undo-inline:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.schedule-undo-inline {
+  min-height: 30px;
+}
+
+/* Ajuste coordenação: colunas fixas opacas para evitar sobreposição ao rolar horizontalmente */
+.schedule-module-card.is-coordination-mode .schedule-table tbody td {
+  background-color: #ffffff !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table tbody tr:nth-child(even):not(.selected-schedule-row):not(.deliverable-title-row) td {
+  background-color: #fbfefd !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table tbody td.schedule-sticky-col {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-clip: padding-box;
+  z-index: 24;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table tbody tr:nth-child(even):not(.selected-schedule-row):not(.deliverable-title-row) td.schedule-sticky-col {
+  background: #fbfefd !important;
+  background-color: #fbfefd !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table thead th.schedule-sticky-col {
+  background: #eef7f5 !important;
+  background-color: #eef7f5 !important;
+  z-index: 34;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row td,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row td.schedule-sticky-col {
+  background-color: #ffffff !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row:nth-child(even) td,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-completed-row:nth-child(even) td.schedule-sticky-col {
+  background-color: #fbfefd !important;
+}
+
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-overdue-row td,
+.schedule-module-card.is-coordination-mode .schedule-table tr.schedule-overdue-row td.schedule-sticky-col {
+  background-color: #ffffff !important;
+}
+
+/* Ajuste coordenação: Gantt mais compacto */
+.schedule-gantt-panel {
+  padding: 10px 12px;
+}
+
+.schedule-gantt-panel .cronograma-dashboard-header {
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.schedule-gantt-panel .eap-gantt {
+  min-width: 980px;
+}
+
+.schedule-gantt-panel .eap-gantt-axis,
+.schedule-gantt-panel .eap-gantt-row {
+  grid-template-columns: 260px minmax(500px, 1fr) 46px;
+  gap: 8px;
+}
+
+.schedule-gantt-panel .eap-gantt-axis {
+  padding: 5px 0 6px;
+  font-size: 0.72rem;
+}
+
+.schedule-gantt-panel .eap-gantt-rows {
+  gap: 3px;
+  max-height: 280px;
+}
+
+.schedule-gantt-panel .eap-gantt-row {
+  min-height: 28px;
+  padding: 2px 0;
+}
+
+.schedule-gantt-panel .eap-gantt-label {
+  font-size: 0.76rem;
+  line-height: 1.2;
+}
+
+.schedule-gantt-panel .eap-gantt-row > strong {
+  font-size: 0.78rem;
+}
+
+.schedule-gantt-panel .eap-gantt-track {
+  height: 20px;
+}
+
+.schedule-gantt-panel .eap-gantt-track > i.planned-bar {
+  top: 3px;
+  height: 7px;
+}
+
+.schedule-gantt-panel .eap-gantt-track > i.real-bar {
+  top: 12px;
+  height: 6px;
+}
+
+.schedule-gantt-panel .schedule-date-marker {
+  top: 5px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
 }
